@@ -15,6 +15,7 @@ Please **do not open a public issue** for security problems. Report them private
 | Consent flow | CSRF, state injection, open redirect | CSRF tokens, KV-backed single-use state bound to a `__Host-` cookie, and redirect URI re-validation against the registered client. |
 | DNS rebinding | A browser on the LAN is tricked into calling the endpoint | `Host` header allow-list derived from `MCP_RESOURCE`. Origin validation is done by the MCP handler. |
 | Upstream credentials | Leakage of the GitHub token | The token is used once to identify the user, then revoked. It is never stored in token props. |
+| Site Manager API key (cloud mode) | The key is account-wide and Ubiquiti's connector accepts writes | The client only issues `GET` requests to allow-listed Integration API read paths (`src/unifi/cloud.ts`). Responses are mapped field by field, so passphrases are never copied. The key is stored only as a Worker secret. Prefer local mode with a View-Only key. |
 | Data exfiltration via the LLM | Tool output contains client names, IPs and MACs | This is inherent to the use case. Only connect assistants you trust with this data. |
 
 ## Out of scope

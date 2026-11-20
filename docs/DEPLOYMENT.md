@@ -1,6 +1,30 @@
 # Deployment guide
 
-This guide deploys the server to your own Cloudflare account and connects it privately to your UniFi console.
+This guide deploys the server to your own Cloudflare account and connects it to your UniFi console. There are two ways to connect:
+
+| | **Local mode** (recommended) | **Cloud mode** |
+| --- | --- | --- |
+| How the Worker reaches the console | Workers VPC → Cloudflare Tunnel (`cloudflared` on your LAN) | Ubiquiti Site Manager (`api.ui.com`) cloud connector |
+| Extra hardware | An always-on LAN host for `cloudflared` | None |
+| Credential | Local API key from a **View-Only** admin | Site Manager API key (account-wide, see below) |
+| Firewall audit, VLAN matrix, IoT isolation, Wi-Fi, firmware | ✅ | ✅ (zone-based firewall required) |
+| Port forwards, UPnP, IPS, device SSH checks | ✅ | ❌ not exposed by the public API |
+| Per-client top talkers | ✅ | ❌ device uplink throughput instead |
+| Legacy (pre-zone) firewall | ✅ | ❌ |
+
+## Cloud mode (no tunnel)
+
+Requirements: UniFi OS 5.0.3 or newer, the zone-based firewall, and a console that is online and connected to unifi.ui.com.
+
+1. Sign in to [unifi.ui.com](https://unifi.ui.com) as the console owner and go to **API** (left menu) → **Create API Key**. Copy the key.
+2. Find your console ID. Open the console in unifi.ui.com: it is the long value in the URL, `https://unifi.ui.com/consoles/<CONSOLE_ID>/...`. If your account owns only one console, you can leave this empty and the server finds it automatically.
+3. In `wrangler.jsonc`, set `"UNIFI_MODE": "cloud"` and `"UNIFI_CONSOLE_ID": "<CONSOLE_ID>"`, and remove the `vpc_services` block.
+4. Store the key as a secret: `npx wrangler secret put UNIFI_API_KEY`.
+5. Continue with [GitHub OAuth app](#4-github-oauth-app-sign-in) and [Secrets and deploy](#5-secrets-and-deploy) below. Skip steps 1–2 and the VPC service.
+
+> **Security note:** a Site Manager API key acts with your UniFi account's permissions on every console you own, and Ubiquiti's connector accepts write methods. This server only ever sends `GET` requests to an allow-list of Integration API read paths, and the key is stored as an encrypted Worker secret that is never returned to clients. Still, treat the key like your UniFi password: revoke it in unifi.ui.com if you suspect it leaked, and prefer local mode with a View-Only key when you can. Ubiquiti limits the connector to 100 requests per minute per console. A full audit uses about 15–25.
+
+## Local mode
 
 ## 1. UniFi: create a read-only API key
 

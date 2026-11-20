@@ -16,7 +16,13 @@
 		// Comma-separated GitHub logins allowed to sign in. Empty = nobody (deny by default).
 		"ALLOWED_GITHUB_USERS": "",
 		// Address of the UniFi OS console as seen from the Cloudflare Tunnel (cloudflared).
+		// "local": reach the console through Workers VPC / Cloudflare Tunnel (full feature set).
+		// "cloud": reach it through UniFi Site Manager (api.ui.com); no tunnel needed, fewer data points.
+		"UNIFI_MODE": "local",
+		// Local mode: address of the UniFi OS console as seen from cloudflared.
 		"UNIFI_BASE_URL": "https://192.168.1.1",
+		// Cloud mode: console (host) ID from unifi.ui.com. Optional if the API key owns a single console.
+		"UNIFI_CONSOLE_ID": "",
 		"UNIFI_SITE": "default"
 	},
 	"kv_namespaces": [

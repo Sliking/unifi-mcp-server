@@ -1,3 +1,4 @@
+import type { DeviceUplink, SourceCapabilities, UnifiSource } from "./source";
 import type {
 	UnifiClient as UnifiStation,
 	UnifiDevice,
@@ -61,7 +62,9 @@ export function assertSiteName(site: string): void {
 }
 
 /** Read-only UniFi Network API client with per-instance memoisation. */
-export class UnifiApi {
+export class UnifiApi implements UnifiSource {
+	readonly mode = "local" as const;
+	readonly capabilities: SourceCapabilities = { clientTraffic: true, portForwards: true, gatewaySettings: true, legacyFirewall: true, health: true };
 	private readonly cache = new Map<string, Promise<unknown>>();
 	private readonly base: URL;
 
@@ -204,6 +207,9 @@ export class UnifiApi {
 	}
 	async trafficRules(site: string) {
 		return this.optional<Record<string, unknown>[]>(this.v2(site, "trafficrules"), []);
+	}
+	async deviceUplinks(_site: string): Promise<DeviceUplink[]> {
+		return [];
 	}
 }
 

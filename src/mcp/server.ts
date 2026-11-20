@@ -4,9 +4,11 @@ import { runAudit } from "../analysis/audit";
 import { type ConnectivityReport, legacyConnectivity, zoneConnectivity } from "../analysis/connectivity";
 import { checkIotIsolation } from "../analysis/iot";
 import { normaliseNetworks } from "../analysis/networks";
-import { formatBytes, formatDuration, toTalker, topTalkers } from "../analysis/traffic";
+import { formatBytes, formatDuration, formatRate, toTalker, topTalkers } from "../analysis/traffic";
 import type { Props } from "../auth/props";
 import { UnifiApi, UnifiError } from "../unifi/client";
+import { UnifiCloudApi } from "../unifi/cloud";
+import type { UnifiSource } from "../unifi/source";
 import { redact } from "../unifi/redact";
 
 export const SERVER_NAME = "unifi-mcp-server";
@@ -38,7 +40,10 @@ function fail(err: unknown): ToolResult {
 	return { content: [{ type: "text", text: `Error: ${message}` }], isError: true };
 }
 
-export function unifiFromEnv(env: Env): UnifiApi {
+export function unifiFromEnv(env: Env): UnifiSource {
+	if ((env.UNIFI_MODE ?? "local") === "cloud") {
+		return new UnifiCloudApi({ apiKey: env.UNIFI_API_KEY, consoleId: env.UNIFI_CONSOLE_ID || undefined });
+	}
 	return new UnifiApi({
 		baseUrl: env.UNIFI_BASE_URL,
 		apiKey: env.UNIFI_API_KEY,
@@ -48,16 +53,18 @@ export function unifiFromEnv(env: Env): UnifiApi {
 	});
 }
 
-async function loadConnectivity(api: UnifiApi, site: string, iotNames?: string[]) {
+async function loadConnectivity(api: UnifiSource, site: string, iotNames?: string[]) {
 	const [rawNetworks, zones] = await Promise.all([api.networks(site), api.zones(site)]);
 	const networks = normaliseNetworks(rawNetworks, zones, iotNames);
 	let connectivity: ConnectivityReport;
-	let rules: Awaited<ReturnType<UnifiApi["firewallRules"]>> = [];
-	let groups: Awaited<ReturnType<UnifiApi["firewallGroups"]>> = [];
-	let policies: Awaited<ReturnType<UnifiApi["firewallPolicies"]>> = [];
+	let rules: Awaited<ReturnType<UnifiSource["firewallRules"]>> = [];
+	let groups: Awaited<ReturnType<UnifiSource["firewallGroups"]>> = [];
+	let policies: Awaited<ReturnType<UnifiSource["firewallPolicies"]>> = [];
 	if (zones.length) {
 		policies = await api.firewallPolicies(site);
 		connectivity = zoneConnectivity(networks, zones, policies);
+	} else if (!api.capabilities.legacyFirewall) {
+		throw new UnifiError("Cloud mode requires the zone-based firewall (UniFi Network 9+). Upgrade or migrate the firewall, or use local mode.");
 	} else {
 		[rules, groups] = await Promise.all([api.firewallRules(site), api.firewallGroups(site)]);
 		connectivity = legacyConnectivity(networks, rules, groups);
@@ -68,7 +75,7 @@ async function loadConnectivity(api: UnifiApi, site: string, iotNames?: string[]
 export interface ServerDeps {
 	env: Env;
 	props?: Props;
-	api?: UnifiApi;
+	api?: UnifiSource;
 }
 
 export function createServer({ env, props, api: injected }: ServerDeps): McpServer {
@@ -87,7 +94,7 @@ export function createServer({ env, props, api: injected }: ServerDeps): McpServ
 		title: string,
 		description: string,
 		inputSchema: S,
-		handler: (args: z.infer<S>, api: UnifiApi) => Promise<unknown>,
+		handler: (args: z.infer<S>, api: UnifiSource) => Promise<unknown>,
 	) => {
 		server.registerTool(name, { title, description, inputSchema, annotations: { title, ...READ_ONLY } }, (async (args: z.infer<S>) => {
 			const started = Date.now();
@@ -117,6 +124,7 @@ export function createServer({ env, props, api: injected }: ServerDeps): McpServ
 			const networks = normaliseNetworks(rawNetworks, zones);
 			return {
 				site,
+				connection: api.mode,
 				firewallMode: zones.length ? "zone-based" : "legacy",
 				health: health.map((h) => ({ subsystem: h.subsystem, status: h.status, wan_ip: h.wan_ip, isp: h.isp_name, latency_ms: h.latency, num_user: h.num_user, num_guest: h.num_guest })),
 				devices: { total: devices.length, online: devices.filter((d) => d.state === 1).length, updatesAvailable: devices.filter((d) => d.upgradable).length },
@@ -157,6 +165,7 @@ export function createServer({ env, props, api: injected }: ServerDeps): McpServ
 						.map((p) => ({ ...p, source: { ...p.source, zone: zoneName.get(p.source?.zone_id ?? "") }, destination: { ...p.destination, zone: zoneName.get(p.destination?.zone_id ?? "") } })),
 					portForwards,
 					trafficRules,
+					...(api.capabilities.portForwards ? {} : { notes: ["Port forwards and traffic rules are not exposed by the UniFi cloud API; they are omitted in cloud mode."] }),
 				};
 			}
 			const [rules, groups] = await Promise.all([api.firewallRules(site), api.firewallGroups(site)]);
@@ -185,6 +194,9 @@ export function createServer({ env, props, api: injected }: ServerDeps): McpServ
 				api.clients(site),
 			]);
 			const report = runAudit({ ...ctx, portForwards, wlans, settings, devices, clients });
+			const caps = api.capabilities;
+			if (!caps.portForwards) report.notes.push("Port forwards are not exposed by the UniFi cloud API, so Internet-exposed port forwards were NOT checked. Review Settings → Routing → Port Forwarding manually.");
+			if (!caps.gatewaySettings) report.notes.push("Gateway settings (UPnP, IPS/IDS, device SSH) are not exposed by the UniFi cloud API and were NOT checked.");
 			if (min_severity) {
 				const order = ["critical", "high", "medium", "low", "info"];
 				report.findings = report.findings.filter((f) => order.indexOf(f.severity) <= order.indexOf(min_severity));
@@ -228,8 +240,21 @@ export function createServer({ env, props, api: injected }: ServerDeps): McpServ
 			network: z.string().max(64).optional().describe("Only include clients on this network name."),
 		}),
 		async ({ site = defaultSite, limit, sort_by, network }, api) => {
+			if (!api.capabilities.clientTraffic) {
+				const uplinks = (await api.deviceUplinks(site)).map((d) => ({ ...d, totalBps: d.rxRateBps + d.txRateBps }));
+				uplinks.sort((a, b) => b.totalBps - a.totalBps);
+				return {
+					site,
+					scope: "devices",
+					devices: uplinks.slice(0, limit).map((d) => ({ name: d.name, model: d.model, mac: d.mac, download: formatRate(d.rxRateBps / 8), upload: formatRate(d.txRateBps / 8), total: formatRate(d.totalBps / 8) })),
+					notes: [
+						"The UniFi cloud API does not expose per-client traffic counters, so this ranks UniFi devices (gateway, switches, access points) by current uplink throughput instead.",
+						"For per-client top talkers, use local mode (Cloudflare Tunnel) or check Insights → Clients in the UniFi app.",
+					],
+				};
+			}
 			const clients = await api.clients(site);
-			return { site, ...topTalkers(clients, { limit, sortBy: sort_by, network }) };
+			return { site, scope: "clients", ...topTalkers(clients, { limit, sortBy: sort_by, network }) };
 		},
 	);
 

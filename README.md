@@ -32,6 +32,11 @@ Connect it to any MCP-capable assistant (Claude, ChatGPT, Perplexity, Cursor, VS
 
 It also ships MCP **prompts** for the four example questions above.
 
+### Two ways to connect
+
+- **Local mode** (recommended): Workers VPC + Cloudflare Tunnel with a View-Only local API key. Full feature set.
+- **Cloud mode**: through Ubiquiti's Site Manager connector (`api.ui.com`) with no tunnel or extra hardware. Port-forward, UPnP and IPS checks and per-client traffic are not available because Ubiquiti's public API does not expose them. See the [comparison](docs/DEPLOYMENT.md).
+
 ## Security model
 
 This server touches home network equipment, so it is built to be safe by default:
@@ -39,7 +44,7 @@ This server touches home network equipment, so it is built to be safe by default
 - **Read-only by construction.** The UniFi client can only issue `GET` requests to an explicit allow-list of endpoints. There is no code path that can change your network.
 - **Standards-based authentication.** OAuth 2.1 authorization server with PKCE S256 ([RFC 7636](https://www.rfc-editor.org/rfc/rfc7636)), Authorization Server Metadata ([RFC 8414](https://www.rfc-editor.org/rfc/rfc8414)), Dynamic Client Registration ([RFC 7591](https://www.rfc-editor.org/rfc/rfc7591)), Protected Resource Metadata ([RFC 9728](https://www.rfc-editor.org/rfc/rfc9728)), Resource Indicators / audience-bound tokens ([RFC 8707](https://www.rfc-editor.org/rfc/rfc8707)), `iss` in authorization responses ([RFC 9207](https://www.rfc-editor.org/rfc/rfc9207)) and Bearer tokens ([RFC 6750](https://www.rfc-editor.org/rfc/rfc6750)), as required by the [MCP authorization spec](https://modelcontextprotocol.io/specification/2025-06-18/basic/authorization).
 - **Deny by default.** Users sign in with GitHub, and only logins listed in `ALLOWED_GITHUB_USERS` are authorised. The allow-list is re-checked on every MCP request, so removing a user revokes access immediately. The GitHub token is revoked right after sign-in and never stored.
-- **No inbound ports on your network.** The Worker reaches your console through [Workers VPC](https://developers.cloudflare.com/workers-vpc/) and an outbound-only Cloudflare Tunnel. The VPC service is pinned to a single host and port, which prevents SSRF. A Cloudflare Access service-token mode is also supported.
+- **No inbound ports on your network.** In local mode, the Worker reaches your console through [Workers VPC](https://developers.cloudflare.com/workers-vpc/) and an outbound-only Cloudflare Tunnel. The VPC service is pinned to a single host and port, which prevents SSRF. A Cloudflare Access service-token mode is also supported. In cloud mode, it goes through Ubiquiti's own cloud connector over HTTPS, using an allow-list of read-only Integration API paths.
 - **Secrets never leave the Worker.** Wi-Fi passphrases, RADIUS secrets, VPN keys and SSH passwords are redacted from every response before it reaches the LLM.
 - **Defence in depth.** Short-lived access tokens (1 h) with refresh-token rotation, per-user rate limiting, DNS-rebinding (Host) protection, CSRF-protected consent screen, `__Host-` cookies, strict security headers, request timeouts and response-size limits, and a structured audit log of every tool call in Workers Observability.
 
