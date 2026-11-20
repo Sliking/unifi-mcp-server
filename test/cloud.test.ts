@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { zoneConnectivity } from "../src/analysis/connectivity";
 import { normaliseNetworks } from "../src/analysis/networks";
 import { createServer } from "../src/mcp/server";
-import { assertAllowedCloudPath, UnifiCloudApi } from "../src/unifi/cloud";
+import { assertAllowedCloudPath, mapDevice, UnifiCloudApi } from "../src/unifi/cloud";
 
 const SITE = "11111111-1111-1111-1111-111111111111";
 const Z = { int: "a0000000-0000-0000-0000-000000000001", iot: "a0000000-0000-0000-0000-000000000002", hot: "a0000000-0000-0000-0000-000000000003", ext: "a0000000-0000-0000-0000-000000000004" };
@@ -112,6 +112,11 @@ describe("UnifiCloudApi", () => {
 		expect(() => assertAllowedCloudPath(`/v1/sites/${SITE}/devices/${SITE}/actions`)).toThrow();
 		expect(() => assertAllowedCloudPath("/v1/sites/default/clients")).toThrow();
 		expect(() => assertAllowedCloudPath("/../../api/auth")).toThrow();
+	});
+
+	it("classifies consoles that also act as access points as gateways", () => {
+		expect(mapDevice({ id: "d", model: "UDR7", features: ["accessPoint", "switching"] }).type).toBe("gateway");
+		expect(mapDevice({ id: "d", model: "U7PRO", features: ["accessPoint"] }).type).toBe("uap");
 	});
 
 	it("rejects an invalid console ID", () => {

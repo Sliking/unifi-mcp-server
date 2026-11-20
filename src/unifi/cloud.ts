@@ -300,12 +300,14 @@ export function mapClient(c: IntClient, networkForIp: (ip?: string) => { id: str
 
 export function mapDevice(d: IntDevice): UnifiDevice {
 	const features = d.features ?? [];
+	// Consoles such as the UDR/UDM/UCG report accessPoint/switching features too; classify them as gateways.
+	const isGateway = features.includes("gateway") || /^(UDR|UDM|UCG|UXG|UX|USG|EFG|UDW)/i.test(d.model ?? "");
 	return {
 		_id: d.id,
 		mac: d.macAddress,
 		name: d.name,
 		model: d.model,
-		type: features.includes("gateway") ? "gateway" : features.includes("accessPoint") ? "uap" : features.includes("switching") ? "usw" : undefined,
+		type: isGateway ? "gateway" : features.includes("accessPoint") ? "uap" : features.includes("switching") ? "usw" : undefined,
 		version: d.firmwareVersion,
 		upgradable: d.firmwareUpdatable === true,
 		state: d.state === "ONLINE" ? 1 : d.state === "OFFLINE" ? 0 : 2,

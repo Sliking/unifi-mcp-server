@@ -1,5 +1,8 @@
 # UniFi MCP Server
 
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/Sliking/unifi-mcp-server)
+[![CI](https://github.com/Sliking/unifi-mcp-server/actions/workflows/ci.yml/badge.svg)](https://github.com/Sliking/unifi-mcp-server/actions/workflows/ci.yml)
+
 A secure, **read-only** remote [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server for UniFi networks, running on **Cloudflare Workers**.
 
 Connect it to any MCP-capable assistant (Claude, ChatGPT, Perplexity, Cursor, VS Code, …) and ask things like:
@@ -57,29 +60,40 @@ See [SECURITY.md](SECURITY.md) for the threat model and how to report vulnerabil
 - A machine on your LAN that can run `cloudflared` (Raspberry Pi, NAS, Docker host, …).
 - A GitHub account for sign-in.
 
-## Quick start
+## Quick start (one-click, cloud mode, about 10 minutes)
 
-Full instructions are in **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**. In short:
+You need a Cloudflare account (the Free plan is fine), a GitHub account, and a UniFi console on UniFi OS 5.0.3+ that you can see at [unifi.ui.com](https://unifi.ui.com).
+
+1. **Find your Worker URL.** In the Cloudflare dashboard, go to **Workers & Pages** and note your `*.workers.dev` subdomain. Your server will be at `https://unifi-mcp-server.<subdomain>.workers.dev`.
+2. **Create a GitHub OAuth app** at <https://github.com/settings/applications/new>:
+   - Homepage URL: `https://unifi-mcp-server.<subdomain>.workers.dev`
+   - Redirect URI: `https://unifi-mcp-server.<subdomain>.workers.dev/callback`
+   - Leave wildcard matching and device flow unchecked. Generate a client secret.
+3. **Create a UniFi API key** at [unifi.ui.com](https://unifi.ui.com) → **API** → **Create API Key**.
+4. **Click _Deploy to Cloudflare_** above and fill in the prompts:
+   - `UNIFI_API_KEY`: the key from step 3
+   - `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`: from step 2
+   - `COOKIE_ENCRYPTION_KEY`: the output of `openssl rand -hex 32`
+5. **Authorise yourself.** In the dashboard, go to **Workers & Pages → unifi-mcp-server → Settings → Variables and Secrets**. Set `ALLOWED_GITHUB_USERS` to your GitHub login. It is empty by default, so nobody can sign in until you set it. If you own more than one UniFi console, also set `UNIFI_CONSOLE_ID`, the long ID in the `unifi.ui.com/consoles/<ID>/…` URL.
+6. **Connect your assistant** to `https://unifi-mcp-server.<subdomain>.workers.dev/mcp` (see below) and sign in with GitHub.
+
+If you deploy under a different Worker name, use that name in the URLs above.
+
+For the full feature set (port forwards, UPnP/IPS checks, per-client traffic), use **local mode** with Cloudflare Tunnel and a View-Only local API key. See **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**.
+
+### Manual deploy (CLI)
 
 ```bash
 git clone https://github.com/Sliking/unifi-mcp-server.git && cd unifi-mcp-server
 npm install
-
-# 1. UniFi: create a View-Only local admin and an API key for it.
-# 2. Cloudflare: create a tunnel, run cloudflared on your LAN, then:
-npx wrangler vpc service create unifi-console --type http --https-port 443 \
-  --ipv4 192.168.1.1 --tunnel-id <TUNNEL_ID> --cert-verification-mode disabled
-npx wrangler kv namespace create OAUTH_KV
-# 3. Fill in wrangler.jsonc (KV id, VPC service id, MCP_RESOURCE, ALLOWED_GITHUB_USERS).
-# 4. Secrets:
+npx wrangler login
+# edit "vars" in wrangler.jsonc (ALLOWED_GITHUB_USERS, UNIFI_MODE, UNIFI_CONSOLE_ID)
 npx wrangler secret put UNIFI_API_KEY
 npx wrangler secret put GITHUB_CLIENT_ID
 npx wrangler secret put GITHUB_CLIENT_SECRET
-npx wrangler secret put COOKIE_ENCRYPTION_KEY   # openssl rand -hex 32
-npm run deploy
+openssl rand -hex 32 | npx wrangler secret put COOKIE_ENCRYPTION_KEY
+npm run deploy                     # the OAuth KV namespace is created automatically
 ```
-
-Then add `https://<your-worker>.workers.dev/mcp` as a remote MCP server / custom connector in your assistant.
 
 ## Connecting clients
 

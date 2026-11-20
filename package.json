@@ -31,5 +31,33 @@
 		"typescript": "^6.0.3",
 		"vitest": "^5.1.1",
 		"wrangler": "^4.165.0"
+	},
+	"cloudflare": {
+		"bindings": {
+			"UNIFI_API_KEY": {
+				"description": "UniFi API key. Cloud mode: Site Manager key from unifi.ui.com \u2192 API. Local mode: UniFi OS key from a View-Only admin."
+			},
+			"GITHUB_CLIENT_ID": {
+				"description": "Client ID of your GitHub OAuth app (callback URL: https://<your-worker-url>/callback)."
+			},
+			"GITHUB_CLIENT_SECRET": {
+				"description": "Client secret of your GitHub OAuth app."
+			},
+			"COOKIE_ENCRYPTION_KEY": {
+				"description": "Random secret for signing cookies. Generate with: openssl rand -hex 32"
+			},
+			"ALLOWED_GITHUB_USERS": {
+				"description": "Comma-separated GitHub logins allowed to sign in. Empty = nobody (deny by default)."
+			},
+			"UNIFI_MODE": {
+				"description": "cloud (no tunnel, via unifi.ui.com) or local (Workers VPC + Cloudflare Tunnel)."
+			},
+			"UNIFI_CONSOLE_ID": {
+				"description": "Cloud mode: console ID from the unifi.ui.com URL. Optional if you own a single console."
+			},
+			"MCP_RESOURCE": {
+				"description": "Optional. Public MCP URL; defaults to this Worker's URL + /mcp."
+			}
+		}
 	}
 }

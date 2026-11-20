@@ -11,26 +11,23 @@
 	"workers_dev": true,
 	"observability": { "enabled": true },
 	"vars": {
-		// Public URL MCP clients connect to. Tokens are bound to it (RFC 8707 / RFC 9728).
-		"MCP_RESOURCE": "http://localhost:8788/mcp",
+		// Public URL MCP clients connect to; tokens are bound to it (RFC 8707 / RFC 9728).
+		// Leave empty to use the Worker's own URL (https://<name>.<subdomain>.workers.dev/mcp).
+		"MCP_RESOURCE": "",
 		// Comma-separated GitHub logins allowed to sign in. Empty = nobody (deny by default).
 		"ALLOWED_GITHUB_USERS": "",
 		// Address of the UniFi OS console as seen from the Cloudflare Tunnel (cloudflared).
 		// "local": reach the console through Workers VPC / Cloudflare Tunnel (full feature set).
 		// "cloud": reach it through UniFi Site Manager (api.ui.com); no tunnel needed, fewer data points.
-		"UNIFI_MODE": "local",
+		"UNIFI_MODE": "cloud",
 		// Local mode: address of the UniFi OS console as seen from cloudflared.
 		"UNIFI_BASE_URL": "https://192.168.1.1",
 		// Cloud mode: console (host) ID from unifi.ui.com. Optional if the API key owns a single console.
 		"UNIFI_CONSOLE_ID": "",
 		"UNIFI_SITE": "default"
 	},
-	"kv_namespaces": [
-		{
-			"binding": "OAUTH_KV",
-			"id": "<KV_NAMESPACE_ID>"
-		}
-	],
+	// Created automatically on first deploy (OAuth clients, grants and encrypted tokens).
+	"kv_namespaces": [{ "binding": "OAUTH_KV" }],
 	"ratelimits": [
 		{
 			"name": "RATE_LIMITER",

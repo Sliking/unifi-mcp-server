@@ -1,9 +1,10 @@
-# Copy to .dev.vars for `npm run dev`. Never commit .dev.vars.
-GITHUB_CLIENT_ID=<github oauth app client id (callback http://localhost:8788/callback)>
-GITHUB_CLIENT_SECRET=<github oauth app client secret>
-COOKIE_ENCRYPTION_KEY=<openssl rand -hex 32>
-UNIFI_API_KEY=<unifi os api key from a View-Only admin>
-ALLOWED_GITHUB_USERS=<your-github-login>
-# Only for the public-hostname + Cloudflare Access mode:
-# CF_ACCESS_CLIENT_ID=
-# CF_ACCESS_CLIENT_SECRET=
+# Secrets. The "Deploy to Cloudflare" button prompts for each of these.
+# For local development, copy to .dev.vars (never commit .dev.vars).
+
+# Site Manager API key (cloud mode, unifi.ui.com -> API) or local UniFi OS API key (local mode)
+UNIFI_API_KEY=
+# GitHub OAuth app, callback https://<worker-url>/callback
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=
+# Random 32+ byte hex string: openssl rand -hex 32
+COOKIE_ENCRYPTION_KEY=

@@ -18,7 +18,7 @@ Requirements: UniFi OS 5.0.3 or newer, the zone-based firewall, and a console th
 
 1. Sign in to [unifi.ui.com](https://unifi.ui.com) as the console owner and go to **API** (left menu) → **Create API Key**. Copy the key.
 2. Find your console ID. Open the console in unifi.ui.com: it is the long value in the URL, `https://unifi.ui.com/consoles/<CONSOLE_ID>/...`. If your account owns only one console, you can leave this empty and the server finds it automatically.
-3. In `wrangler.jsonc`, set `"UNIFI_MODE": "cloud"` and `"UNIFI_CONSOLE_ID": "<CONSOLE_ID>"`, and remove the `vpc_services` block.
+3. In `wrangler.jsonc`, keep `"UNIFI_MODE": "cloud"` (the default) and set `"UNIFI_CONSOLE_ID": "<CONSOLE_ID>"` if needed. Or use the **Deploy to Cloudflare** button in the README.
 4. Store the key as a secret: `npx wrangler secret put UNIFI_API_KEY`.
 5. Continue with [GitHub OAuth app](#4-github-oauth-app-sign-in) and [Secrets and deploy](#5-secrets-and-deploy) below. Skip steps 1–2 and the VPC service.
 
@@ -66,9 +66,9 @@ npx wrangler vpc service create unifi-console \
   --type http --https-port 443 --ipv4 192.168.1.1 \
   --tunnel-id <TUNNEL_ID> --cert-verification-mode disabled
 
-# Storage for OAuth clients, grants and tokens (encrypted by the OAuth library)
-npx wrangler kv namespace create OAUTH_KV
 ```
+
+The `OAUTH_KV` namespace, which stores OAuth clients, grants and encrypted tokens, is created automatically on the first `wrangler deploy`.
 
 > **TLS note:** UniFi consoles use a self-signed certificate. Traffic between the Worker and `cloudflared` is always encrypted by the tunnel. `disabled` only skips certificate verification on the last LAN hop. For stricter verification, export the console certificate, upload it with `npx wrangler cert upload certificate-authority --ca-cert unifi.pem --name unifi`, then use `--certificate-authority <ID> --cert-verification-mode verify_ca`.
 
@@ -76,16 +76,16 @@ Edit `wrangler.jsonc`:
 
 ```jsonc
 "vars": {
-  "MCP_RESOURCE": "https://unifi-mcp-server.<your-subdomain>.workers.dev/mcp",
+  "MCP_RESOURCE": "",              // empty = this Worker's own URL + /mcp
+  "UNIFI_MODE": "local",
   "ALLOWED_GITHUB_USERS": "your-github-login",
   "UNIFI_BASE_URL": "https://192.168.1.1",
   "UNIFI_SITE": "default"
 },
-"kv_namespaces": [{ "binding": "OAUTH_KV", "id": "<KV_ID>" }],
 "vpc_services": [{ "binding": "UNIFI_VPC", "service_id": "<VPC_SERVICE_ID>", "remote": true }]
 ```
 
-`MCP_RESOURCE` must be the exact public URL clients use. Access tokens are bound to it.
+Access tokens are bound to the public MCP URL. If you serve the Worker on a custom domain, set `MCP_RESOURCE` to `https://<your-domain>/mcp`.
 
 > **Tip:** to keep your personal IDs out of git, copy `wrangler.jsonc` to `wrangler.local.jsonc` (git-ignored), fill it in there, and use `npm run deploy:local` (add `-c wrangler.local.jsonc` to `wrangler secret put`).
 

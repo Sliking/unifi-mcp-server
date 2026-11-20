@@ -1,4 +1,3 @@
-import { env as globalEnv } from "cloudflare:workers";
 import OAuthProvider from "@cloudflare/workers-oauth-provider";
 import { createMcpHandler } from "agents/mcp/server";
 import { GitHubHandler } from "./auth/github-handler";
@@ -27,21 +26,41 @@ const apiHandler = {
 		const handler = createMcpHandler(() => createServer({ env, props }), {
 			route: "/mcp",
 			// DNS-rebinding protection: only accept requests addressed to our own public hostname.
-			allowedHostnames: [new URL(env.MCP_RESOURCE).hostname],
+			allowedHostnames: [new URL(resourceUrl(env, request)).hostname],
 		});
 		return handler(request, env, ctx);
 	},
 } satisfies ExportedHandler<Env>;
 
-export default new OAuthProvider<Env>({
-	apiRoute: "/mcp",
-	apiHandler,
-	defaultHandler: GitHubHandler as unknown as ExportedHandler<Env>,
-	authorizeEndpoint: "/authorize",
-	tokenEndpoint: "/token",
-	clientRegistrationEndpoint: "/register",
-	accessTokenTTL: ACCESS_TOKEN_TTL,
-	refreshTokenTTL: REFRESH_TOKEN_TTL,
-	// RFC 9728: tokens are audience-bound to this resource (RFC 8707).
-	resourceMetadata: { resource: globalEnv.MCP_RESOURCE },
-});
+/** Public MCP endpoint. Uses MCP_RESOURCE when set, otherwise the hostname Cloudflare routed the request to. */
+function resourceUrl(env: Env, request: Request): string {
+	return env.MCP_RESOURCE || `${new URL(request.url).origin}/mcp`;
+}
+
+const providers = new Map<string, OAuthProvider<Env>>();
+
+function providerFor(resource: string): OAuthProvider<Env> {
+	let provider = providers.get(resource);
+	if (!provider) {
+		provider = new OAuthProvider<Env>({
+			apiRoute: "/mcp",
+			apiHandler,
+			defaultHandler: GitHubHandler as unknown as ExportedHandler<Env>,
+			authorizeEndpoint: "/authorize",
+			tokenEndpoint: "/token",
+			clientRegistrationEndpoint: "/register",
+			accessTokenTTL: ACCESS_TOKEN_TTL,
+			refreshTokenTTL: REFRESH_TOKEN_TTL,
+			// RFC 9728: tokens are audience-bound to this resource (RFC 8707).
+			resourceMetadata: { resource },
+		});
+		providers.set(resource, provider);
+	}
+	return provider;
+}
+
+export default {
+	fetch(request: Request, env: Env, ctx: ExecutionContext) {
+		return providerFor(resourceUrl(env, request)).fetch(request, env, ctx);
+	},
+} satisfies ExportedHandler<Env>;
