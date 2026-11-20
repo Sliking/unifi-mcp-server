@@ -1,0 +1,33 @@
+{
+	"name": "unifi-mcp-server",
+	"version": "0.1.0",
+	"description": "Secure, read-only remote MCP server for UniFi networks, running on Cloudflare Workers.",
+	"license": "MIT",
+	"private": true,
+	"type": "module",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/Sliking/unifi-mcp-server.git"
+	},
+	"scripts": {
+		"dev": "wrangler dev",
+		"deploy": "wrangler deploy",
+		"cf-typegen": "wrangler types --strict-vars=false",
+		"type-check": "tsc --noEmit",
+		"test": "vitest run",
+		"check": "npm run type-check && npm test"
+	},
+	"dependencies": {
+		"@cloudflare/workers-oauth-provider": "^1.2.4",
+		"@modelcontextprotocol/server": "2.4.0",
+		"agents": "^0.33.0",
+		"hono": "^4.12.27",
+		"zod": "^4.4.3"
+	},
+	"devDependencies": {
+		"@cloudflare/workers-types": "^5.20261120.1",
+		"typescript": "^6.0.3",
+		"vitest": "^5.1.1",
+		"wrangler": "^4.165.0"
+	}
+}

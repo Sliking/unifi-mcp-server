@@ -1,0 +1,46 @@
+/**
+ * Wrangler configuration. See docs/DEPLOYMENT.md for the full setup.
+ * https://developers.cloudflare.com/workers/wrangler/configuration/
+ */
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "unifi-mcp-server",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-11-01",
+	"compatibility_flags": ["nodejs_compat"],
+	"workers_dev": true,
+	"observability": { "enabled": true },
+	"vars": {
+		// Public URL MCP clients connect to. Tokens are bound to it (RFC 8707 / RFC 9728).
+		"MCP_RESOURCE": "http://localhost:8788/mcp",
+		// Comma-separated GitHub logins allowed to sign in. Empty = nobody (deny by default).
+		"ALLOWED_GITHUB_USERS": "",
+		// Address of the UniFi OS console as seen from the Cloudflare Tunnel (cloudflared).
+		"UNIFI_BASE_URL": "https://192.168.1.1",
+		"UNIFI_SITE": "default"
+	},
+	"kv_namespaces": [
+		{
+			"binding": "OAUTH_KV",
+			"id": "<KV_NAMESPACE_ID>"
+		}
+	],
+	"ratelimits": [
+		{
+			"name": "RATE_LIMITER",
+			"namespace_id": "1001",
+			"simple": { "limit": 60, "period": 60 }
+		}
+	],
+	/**
+	 * Recommended: reach the console privately through Workers VPC + Cloudflare Tunnel.
+	 * Create the service with `wrangler vpc service create` (see docs/DEPLOYMENT.md), then uncomment.
+	 */
+	// "vpc_services": [
+	// 	{ "binding": "UNIFI_VPC", "service_id": "<VPC_SERVICE_ID>", "remote": true }
+	// ],
+	"dev": { "port": 8788 },
+	"secrets": {
+		"required": ["GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET", "COOKIE_ENCRYPTION_KEY", "UNIFI_API_KEY"]
+	}
+}
