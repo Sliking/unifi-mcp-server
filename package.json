@@ -12,6 +12,7 @@
 	"scripts": {
 		"dev": "wrangler dev",
 		"deploy": "wrangler deploy",
+		"deploy:local": "wrangler deploy -c wrangler.local.jsonc",
 		"cf-typegen": "wrangler types --strict-vars=false",
 		"type-check": "tsc --noEmit",
 		"test": "vitest run",

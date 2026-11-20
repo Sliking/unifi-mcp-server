@@ -63,6 +63,8 @@ Edit `wrangler.jsonc`:
 
 `MCP_RESOURCE` must be the exact public URL clients use. Access tokens are bound to it.
 
+> **Tip:** to keep your personal IDs out of git, copy `wrangler.jsonc` to `wrangler.local.jsonc` (git-ignored), fill it in there, and use `npm run deploy:local` (add `-c wrangler.local.jsonc` to `wrangler secret put`).
+
 ## 4. GitHub OAuth app (sign-in)
 
 1. Go to **GitHub → Settings → Developer settings → OAuth Apps → New OAuth App**.
